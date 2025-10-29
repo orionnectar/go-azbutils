@@ -29,7 +29,12 @@ checksum:
   name_template: "checksums.txt"
 brews:
   - name: azbutils
-    homepage: "https://github.com/orionnectar/go-azbutils"
+    homepage: "https://github.com/orionnectar/homebrew-tools"
+    repository:
+      owner: orionnectar
+      name: homebrew-tools
+      branch: main
+    skip_upload: auto
     description: "gsutil-like CLI for Azure Blob Storage."
     license: MIT
     install: |
