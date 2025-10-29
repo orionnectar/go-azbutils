@@ -1,0 +1,38 @@
+# .goreleaser.yml
+version: 2
+project_name: azbutils
+release:
+  github:
+    owner: orionnectar
+    name: go-azbutils
+  draft: false
+  prerelease: "false"
+builds:
+  - main: ./main.go
+    binary: azbutils
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Tag }}
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+checksum:
+  name_template: "checksums.txt"
+brews:
+  - name: azbutils
+    homepage: "https://github.com/orionnectar/go-azbutils"
+    description: "gsutil-like CLI for Azure Blob Storage."
+    license: MIT
+    install: |
+      bin.install "azbutils"
+    test: |
+      system "#{bin}/azbutils", "--version"
