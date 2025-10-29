@@ -34,6 +34,7 @@ brews:
       owner: orionnectar
       name: homebrew-tools
       branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     skip_upload: auto
     description: "gsutil-like CLI for Azure Blob Storage."
     license: MIT
