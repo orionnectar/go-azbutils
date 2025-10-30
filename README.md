@@ -59,11 +59,14 @@ go build -o go-azbutils .
 
 ## Usage
 
-### 1. Connect to an Account
+### Connect to an Account
 
 ```bash
 azbutils connect <account-name>
 ```
+
+<img src="(docs/screenshots/azbutils_connect_options.png" width="400" />
+
 
 You’ll be prompted to select an authentication method.
 
@@ -87,28 +90,16 @@ export GOAZBUTILS_SAS_URL="https://goazbutils.blob.core.windows.net/?sv=..."
 
 ---
 
-### 2. Verify Connection
+### Verify Connection
 
 ```bash
 azbutils connect goazbutils
 ```
 
-Output:
-
-```
-Testing connection...
-Successfully connected to account 'goazbutils'
-```
-
+<img src="docs/screenshots/azbutils_connect_successful.png" width="400" />
 ---
 
-### 3. List Containers or Blobs
-
-List containers:
-
-```bash
-azbutils ls az://goazbutils//
-```
+### List Containers or Blobs
 
 List blobs inside a container:
 
@@ -116,15 +107,50 @@ List blobs inside a container:
 azbutils ls az://goazbutils//testcontainer
 ```
 
+<img src="docs/screenshots/azbutils_ls.png" width="400" />
+
 Recursive listing:
 
 ```bash
 azbutils ls az://goazbutils//testcontainer -r
 ```
 
+<img src="docs/screenshots/azbutils_ls_recursive.png" width="400" />
+
+---
+### Cat Blobs
+
+Cat blobs:
+
+```bash
+azbutils cat az://goazbutils//testcontainer/hello.txt
+```
+
+<img src="docs/screenshots/azbutils_cat.png" width="400" />
+
+
+### Copy Blobs
+
+Copy blob:
+
+```bash
+azbutils cp az://goazbutils//
+```
+
+<img src="docs/screenshots/azbutils_cp.png" width="400" />
+
+Recursive Copy:
+
+```bash
+azbutils cp az://goazbutils//testcontainer -r
+```
+
+<img src="docs/screenshots/azbutils_cp_dryrun.png" width="400" />
+
 ---
 
-### 4. Reset Account Metadata
+
+### Reset Account Metadata
 
 ```bash
 azbutils connect <account-name> --reset
@@ -165,19 +191,6 @@ export GOAZBUTILS_CONNECTION_STRING="DefaultEndpointsProtocol=https;AccountName=
 export GOAZBUTILS_ACCOUNT_KEY="abc123xyz"
 export GOAZBUTILS_SAS_URL="https://goazbutils.blob.core.windows.net/?sv=..."
 ```
-
----
-
-## Screenshots
-
-Here’s how easy it is to connect and use:
-
-| Connect Flow | List | Cat | Copy | 
-|---------------|------|-----|------|
-| ![Step 1](docs/screenshots/azbutils_connect_options.png)<br>![Step 2](docs/screenshots/azbutils_connect_successful.png) |  ![Step 1](docs/screenshots/azbutils_ls.png)<br>![Step 2](docs/screenshots/azbutils_ls_recursive.png) | ![Cat](docs/screenshots/azbutils_cat.png) |  ![Step 1](docs/screenshots/azbutils_cp.png)<br>![Step 2](docs/screenshots/azbutils_cp_dryrun.png) |
-
-
-
 ---
 
 ## Troubleshooting
