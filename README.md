@@ -65,7 +65,7 @@ go build -o go-azbutils .
 azbutils connect <account-name>
 ```
 
-<img src="(docs/screenshots/azbutils_connect_options.png" width="400" />
+<img src="docs/screenshots/azbutils_connect_options.png" width="400" />
 
 
 You’ll be prompted to select an authentication method.
@@ -97,6 +97,7 @@ azbutils connect goazbutils
 ```
 
 <img src="docs/screenshots/azbutils_connect_successful.png" width="400" />
+
 ---
 
 ### List Containers or Blobs
@@ -118,20 +119,17 @@ azbutils ls az://goazbutils//testcontainer -r
 <img src="docs/screenshots/azbutils_ls_recursive.png" width="400" />
 
 ---
-### Cat Blobs
 
-Cat blobs:
+### Cat Blobs
 
 ```bash
 azbutils cat az://goazbutils//testcontainer/hello.txt
 ```
 
 <img src="docs/screenshots/azbutils_cat.png" width="400" />
-
+---
 
 ### Copy Blobs
-
-Copy blob:
 
 ```bash
 azbutils cp az://goazbutils//
@@ -148,7 +146,6 @@ azbutils cp az://goazbutils//testcontainer -r
 <img src="docs/screenshots/azbutils_cp_dryrun.png" width="400" />
 
 ---
-
 
 ### Reset Account Metadata
 
