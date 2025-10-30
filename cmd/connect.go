@@ -2,9 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/orionnectar/go-azbutils/internal/azure"
 	"github.com/orionnectar/go-azbutils/internal/config"
 	"github.com/spf13/cobra"
@@ -36,21 +37,20 @@ var connectCmd = &cobra.Command{
 			return fmt.Errorf("please specify an account name (e.g. azbutils connect myaccount)")
 		}
 
+		// Only run setup if account metadata missing or reset requested
 		if resetConfig || cfg.Accounts[accountName] == nil {
 			var acctCfg *config.AccountConfig
 			var err error
-
 			if useAzLogin {
 				acctCfg, err = setupAzLogin(accountName)
 			} else {
 				acctCfg, err = interactiveSetup(accountName)
 			}
-
 			if err != nil {
 				return err
 			}
-			cfg.Accounts[accountName] = acctCfg
 
+			cfg.Accounts[accountName] = acctCfg
 			if cfg.DefaultAccount == "" {
 				cfg.DefaultAccount = accountName
 			}
@@ -58,87 +58,80 @@ var connectCmd = &cobra.Command{
 			if err := config.Save(cfg); err != nil {
 				return fmt.Errorf("failed to save config: %w", err)
 			}
-			fmt.Printf("💾 Account '%s' saved.\n", accountName)
+
+			fmt.Printf("Account '%s' saved\n", accountName)
 		}
 
 		acctCfg := cfg.Accounts[accountName]
+		envName := strings.ToUpper(accountName)
+		// Populate secret in the AccountConfig from environment
+		switch acctCfg.AuthMethod {
+		case "connection-string":
+			acctCfg.Connection = os.Getenv(fmt.Sprintf("%s_CONNECTION_STRING", envName))
+			if acctCfg.Connection == "" {
+				return fmt.Errorf("missing environment variable: %s_CONNECTION_STRING", envName)
+			}
+		case "shared-key":
+			acctCfg.AccountKey = os.Getenv(fmt.Sprintf("%s_ACCOUNT_KEY", envName))
+			if acctCfg.AccountKey == "" {
+				return fmt.Errorf("missing environment variable: %s_ACCOUNT_KEY", envName)
+			}
+		case "sas":
+			acctCfg.ServiceURL = os.Getenv(fmt.Sprintf("%s_SAS_URL", envName))
+			if acctCfg.ServiceURL == "" {
+				return fmt.Errorf("missing environment variable: %s_SAS_URL", envName)
+			}
+		case "az-login":
+			// no action needed, will use Azure CLI credential internally
+		default:
+			return fmt.Errorf("unsupported auth method: %s", acctCfg.AuthMethod)
+		}
+
 		client, err := azure.NewClientFromConfigAccount(acctCfg)
 		if err != nil {
 			return fmt.Errorf("failed to create client: %w", err)
 		}
 
-		fmt.Println("🔗 Testing connection...")
+		if err != nil {
+			return fmt.Errorf("failed to create client: %w", err)
+		}
+
+		fmt.Println("Testing connection...")
 		if err := azure.TestConnection(client); err != nil {
 			return fmt.Errorf("connection test failed: %w", err)
 		}
 
-		fmt.Printf("✅ Successfully connected to account '%s'\n", accountName)
+		fmt.Printf("Successfully connected to account '%s'\n", accountName)
 		return nil
 	},
 }
 
-// setupAzLogin handles credential setup via Azure CLI login
 func setupAzLogin(name string) (*config.AccountConfig, error) {
-	fmt.Println("🔑 Using Azure CLI credentials...")
-
-	// Test if Azure CLI credentials are available
-	cred, err := azidentity.NewAzureCLICredential(nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Azure CLI credential: %w", err)
-	}
-
-	var serviceURL string
-	survey.AskOne(&survey.Input{
-		Message: "Service URL (e.g. https://<account>.blob.core.windows.net):",
-	}, &serviceURL)
-
+	defaultURL := fmt.Sprintf("https://%s.blob.core.windows.net", name)
 	acct := &config.AccountConfig{
 		AccountName: name,
-		ServiceURL:  serviceURL,
+		ServiceURL:  defaultURL,
 		AuthMethod:  "az-login",
 	}
-
-	// Test connection directly
-	client, err := azure.NewClientWithCredential(serviceURL, cred)
-	if err != nil {
-		return nil, fmt.Errorf("failed to test Azure CLI credential: %w", err)
-	}
-
-	if err := azure.TestConnection(client); err != nil {
-		return nil, fmt.Errorf("Azure CLI credential test failed: %w", err)
-	}
-
-	fmt.Println("✅ Azure CLI credentials verified")
+	fmt.Printf("Using Azure CLI credentials for account '%s' with Service URL '%s'\n", name, defaultURL)
 	return acct, nil
 }
 
 func interactiveSetup(name string) (*config.AccountConfig, error) {
 	acct := &config.AccountConfig{AccountName: name}
-
 	authOptions := []string{"az-login", "connection-string", "shared-key", "sas"}
+
 	survey.AskOne(&survey.Select{
 		Message: "Choose auth method:",
 		Options: authOptions,
 	}, &acct.AuthMethod)
 
-	survey.AskOne(&survey.Input{
-		Message: "Service URL (e.g. https://account.blob.core.windows.net):",
-	}, &acct.ServiceURL)
-
-	switch acct.AuthMethod {
-	case "connection-string":
-		survey.AskOne(&survey.Password{Message: "Connection string:"}, &acct.Connection)
-	case "shared-key":
-		survey.AskOne(&survey.Input{Message: "Account name:"}, &acct.AccountName)
-		survey.AskOne(&survey.Password{Message: "Account key:"}, &acct.AccountKey)
-	case "sas":
-		survey.AskOne(&survey.Input{Message: "SAS URL (with ?sig=...):"}, &acct.ServiceURL)
-	}
-
+	// Service URL is always set based on account name
+	acct.ServiceURL = fmt.Sprintf("https://%s.blob.core.windows.net", name)
 	return acct, nil
 }
 
 func init() {
-	connectCmd.Flags().BoolVar(&resetConfig, "reset", false, "Reset configuration for this account")
+	connectCmd.Flags().BoolVar(&resetConfig, "reset", false, "Reset metadata for this account")
 	connectCmd.Flags().BoolVar(&useAzLogin, "use-az-login", false, "Use Azure CLI login credentials")
 }
