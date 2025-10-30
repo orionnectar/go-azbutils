@@ -25,7 +25,8 @@
 ### Using Homebrew (recommended)
 
 ```bash
-brew install orionnectar/tools/azbutils
+brew tap orionnectar/homebrew-tools
+brew install azbutils
 ````
 
 ### Using Go
