@@ -16,11 +16,12 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: 1.23
-      - name: Install GoReleaser v2
-        run: |
-          curl -sSLf https://git.io/goreleaser | bash
-      - name: Release
-        run: goreleaser release --clean
+      - name: Set up GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN_GO_PUBLISH }}
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.GH_TOKEN_GO_PUBLISH }}

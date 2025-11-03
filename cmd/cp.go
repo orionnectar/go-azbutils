@@ -100,7 +100,6 @@ func uploadFile(localPath, dst string) error {
 		return fmt.Errorf("upload failed: %w", err)
 	}
 
-	fmt.Println("Upload complete")
 	return nil
 }
 
