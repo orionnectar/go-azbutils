@@ -3,37 +3,30 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
+	"github.com/orionnectar/go-azbutils/internal/azpath"
 	"github.com/orionnectar/go-azbutils/internal/azure"
 	"github.com/orionnectar/go-azbutils/internal/config"
 	"github.com/spf13/cobra"
 )
 
-var recursive bool
+var (
+	recursive bool
+	fullPath  bool
+	pretty    bool
+)
 
 var lsCmd = &cobra.Command{
-	Use:   "ls [az://account//container[/path]]",
+	Use:   "ls [az://account//container[/path]] or [https://...]",
 	Short: "List blobs in a container or virtual directory",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		path := strings.TrimPrefix(args[0], "az://")
-		parts := strings.SplitN(path, "//", 2)
-		if len(parts) < 2 {
-			return fmt.Errorf("invalid path format. use az://<account>//<container>")
-		}
-
-		accountName := parts[0]
-		containerPath := parts[1]
-
-		containerParts := strings.SplitN(containerPath, "/", 2)
-		containerName := containerParts[0]
-		prefix := ""
-		if len(containerParts) == 2 {
-			prefix = containerParts[1]
+		p, err := azpath.Parse(args[0])
+		if err != nil {
+			return err
 		}
 
 		cfg, err := config.Load()
@@ -41,9 +34,9 @@ var lsCmd = &cobra.Command{
 			return fmt.Errorf("failed to load config: %w", err)
 		}
 
-		acctCfg := cfg.Accounts[accountName]
+		acctCfg := cfg.Accounts[p.Account]
 		if acctCfg == nil {
-			return fmt.Errorf("no account config found for '%s'", accountName)
+			return fmt.Errorf("no account config found for '%s'", p.Account)
 		}
 
 		client, err := azure.NewClientFromConfigAccount(acctCfg)
@@ -54,35 +47,33 @@ var lsCmd = &cobra.Command{
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-		containerClient := client.ServiceClient().NewContainerClient(containerName)
+		containerClient := client.ServiceClient().NewContainerClient(p.Container)
 
-		fmt.Printf("Listing blobs in '%s' (account: %s):\n", containerName, accountName)
+		fmt.Printf("Listing blobs in '%s' (account: %s):\n", p.Container, p.Account)
 
 		if recursive {
-			// Recursive: list all blobs (flat)
-			pager := containerClient.NewListBlobsFlatPager(&azblob.ListBlobsFlatOptions{Prefix: &prefix})
+			pager := containerClient.NewListBlobsFlatPager(&azblob.ListBlobsFlatOptions{Prefix: &p.SubPath})
 			for pager.More() {
 				page, err := pager.NextPage(ctx)
 				if err != nil {
 					return fmt.Errorf("list error: %w", err)
 				}
 				for _, blob := range page.Segment.BlobItems {
-					fmt.Printf(" 📄 %s\n", *blob.Name)
+					printBlob(p, *blob.Name, false)
 				}
 			}
 		} else {
-			// Non-recursive: list only immediate blobs + prefixes
-			pager := containerClient.NewListBlobsHierarchyPager("/", &container.ListBlobsHierarchyOptions{Prefix: &prefix})
+			pager := containerClient.NewListBlobsHierarchyPager("/", &container.ListBlobsHierarchyOptions{Prefix: &p.SubPath})
 			for pager.More() {
 				page, err := pager.NextPage(ctx)
 				if err != nil {
 					return fmt.Errorf("list error: %w", err)
 				}
 				for _, prefix := range page.Segment.BlobPrefixes {
-					fmt.Printf(" 📁 %s\n", *prefix.Name)
+					printBlob(p, *prefix.Name, true)
 				}
 				for _, blob := range page.Segment.BlobItems {
-					fmt.Printf(" 📄 %s\n", *blob.Name)
+					printBlob(p, *blob.Name, false)
 				}
 			}
 		}
@@ -93,4 +84,26 @@ var lsCmd = &cobra.Command{
 
 func init() {
 	lsCmd.Flags().BoolVarP(&recursive, "recursive", "r", false, "Recursively list all blobs")
+	lsCmd.Flags().BoolVar(&fullPath, "full-path", false, "Show full blob path (az:// or https)")
+	lsCmd.Flags().BoolVar(&pretty, "pretty", false, "Show pretty icons for files and directories")
+}
+
+func printBlob(p *azpath.BlobPath, name string, isDir bool) {
+	var output string
+
+	if fullPath {
+		output = p.BuildFull(name)
+	} else {
+		output = name
+	}
+
+	if pretty {
+		if isDir {
+			fmt.Printf(" 📁 %s\n", output)
+		} else {
+			fmt.Printf(" 📄 %s\n", output)
+		}
+	} else {
+		fmt.Println(output)
+	}
 }

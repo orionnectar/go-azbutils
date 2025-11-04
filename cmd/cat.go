@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 	"time"
 
+	"github.com/orionnectar/go-azbutils/internal/azpath"
 	"github.com/orionnectar/go-azbutils/internal/azure"
 	"github.com/orionnectar/go-azbutils/internal/config"
 	"github.com/spf13/cobra"
@@ -20,36 +20,19 @@ var catCmd = &cobra.Command{
 	Short: "Print the contents of a blob or save it to a local file",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		src := args[0]
-		if !strings.HasPrefix(src, "az://") {
-			return fmt.Errorf("source must be an Azure blob path (az://account//container/blob)")
+		p, err := azpath.Parse(args[0])
+		if err != nil {
+			return err
 		}
-
-		path := strings.TrimPrefix(src, "az://")
-		parts := strings.SplitN(path, "//", 2)
-		if len(parts) != 2 {
-			return fmt.Errorf("invalid blob path format. Expected az://account//container/blob")
-		}
-
-		accountName := parts[0]
-		containerAndBlob := parts[1]
-
-		containerParts := strings.SplitN(containerAndBlob, "/", 2)
-		if len(containerParts) != 2 {
-			return fmt.Errorf("blob path must include both container and blob name")
-		}
-
-		containerName := containerParts[0]
-		blobName := containerParts[1]
 
 		cfg, err := config.Load()
 		if err != nil {
 			return fmt.Errorf("failed to load config: %w", err)
 		}
 
-		acctCfg := cfg.Accounts[accountName]
+		acctCfg := cfg.Accounts[p.Account]
 		if acctCfg == nil {
-			return fmt.Errorf("no account found in config for '%s'", accountName)
+			return fmt.Errorf("no account found in config for '%s'", p.Account)
 		}
 
 		client, err := azure.NewClientFromConfigAccount(acctCfg)
@@ -57,8 +40,8 @@ var catCmd = &cobra.Command{
 			return fmt.Errorf("failed to create Azure client: %w", err)
 		}
 
-		containerClient := client.ServiceClient().NewContainerClient(containerName)
-		blobClient := containerClient.NewBlockBlobClient(blobName)
+		containerClient := client.ServiceClient().NewContainerClient(p.Container)
+		blobClient := containerClient.NewBlockBlobClient(p.SubPath)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
@@ -87,7 +70,7 @@ var catCmd = &cobra.Command{
 		}
 		defer out.Close()
 
-		fmt.Printf("Downloading blob '%s' → %s\n", blobName, outputFile)
+		fmt.Printf("Downloading blob '%s' → %s\n", p.SubPath, outputFile)
 		_, err = io.Copy(out, reader)
 		if err != nil {
 			return fmt.Errorf("failed to write file: %w", err)
